@@ -1,0 +1,57 @@
+name: Publish Docker image
+
+on:
+  push:
+    tags:
+      - v*.*.*
+      - latest
+
+jobs:
+  build_push_to_registry:
+    name: Build and push Docker image to Docker Hub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: wearelegacy/planter
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}},suffix=-${{ github.run_number }},enable=${{ startsWith(github.ref_name, 'v') }}
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref_name, 'v') }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref_name, 'v') }}
+            type=semver,pattern={{major}},enable=${{ startsWith(github.ref_name, 'v') }}
+            type=raw,value=latest
+
+      - name: Extract planter version from tag
+        run: |
+          echo "PLANTER_VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v3
+        with:
+          build-args: |
+            PLANTER_VERSION=${{ env.PLANTER_VERSION }}
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
