@@ -1,2 +1,3 @@
-# planter-docker-image
-Docker image build configuration for planter
+# pg-erd
+
+PostgreSQL database Entity-Relationship diagram generator

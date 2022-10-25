@@ -1,0 +1,98 @@
+#!/bin/sh
+
+DEFAULT_DB_HOST="localhost"
+DEFAULT_DB_NAME="postgres"
+DEFAULT_DB_USERNAME="postgres"
+DEFAULT_DB_PASSWORD="postgres"
+DEFAULT_PLANTUML_SERVER_URL="https://www.plantuml.com/plantuml"
+
+_isValidCommand() {
+    local command="$1"
+    
+    [[ "$(type cmd_$command 2>/dev/null)" =~ "cmd_$command is a function" ]]
+}
+
+cmd_puml() {
+    local tempDir="$(mktemp -d)"
+    local stdoutLogFile="$tempDir/stdout.log"
+    local stderrLogFile="$tempDir/stderr.log"
+
+    planter "postgres://${DB_USERNAME=$DEFAULT_DB_USERNAME}:${DB_PASSWORD=$DEFAULT_DB_PASSWORD}@${DB_HOST=$DEFAULT_DB_HOST}/${DB_NAME=$DEFAULT_DB_NAME}?sslmode=disable" 1>$stdoutLogFile 2>$stderrLogFile
+    local retCode="$?"
+    if [ $retCode -ne 0 ]; then
+        echo "An error occurred while creating the PlantUML file!"
+        echo ""
+        cat "$stderrLogFile"
+        exit $retCode
+    fi
+
+    cat "$stdoutLogFile"
+}
+
+cmd_svg() {
+    local tempDir="$(mktemp -d)"
+    local pumlFileBaseName="db-diagram"
+    local pumlFile="$tempDir/$pumlFileBaseName.puml"
+    # python-plantuml has a bug that always creates the output file with .png extension
+    local outputFile="$tempDir/$pumlFileBaseName.png"
+    local stdoutLogFile="$tempDir/stdout.log"
+    local stderrLogFile="$tempDir/stderr.log"
+
+    cmd_puml > $pumlFile
+
+    python -m plantuml -o "$tempDir" -s "${PLANTUML_SERVER_URL=$DEFAULT_PLANTUML_SERVER_URL}/svg/" "$pumlFile" 1>$stdoutLogFile 2>$stderrLogFile
+    local retCode="$?"
+    if [ $retCode -ne 0 ]; then
+        echo "An error occurred while generating the SVG image!"
+        echo ""
+        cat "$stderrLogFile"
+        exit $retCode
+    fi
+
+    cat "$outputFile"
+}
+
+cmd_help() {
+    echo "usage: $0 <cmd>"
+    
+    echo ""
+    
+    echo "Available environment variables:"
+    local envVarTable=""
+    envVarTable="$envVarTable\n |DB_HOST|Address of the PostgreSQL server (default: $DEFAULT_DB_HOST)"
+    envVarTable="$envVarTable\n |DB_NAME|Name of the PostgreSQL database (default: $DEFAULT_DB_NAME)"
+    envVarTable="$envVarTable\n |DB_USERNAME|PostgreSQL database role username (default: $DEFAULT_DB_USERNAME)"
+    envVarTable="$envVarTable\n |DB_PASSWORD|PostgreSQL database role password (default: $DEFAULT_DB_PASSWORD)"
+    envVarTable="$envVarTable\n |PLANTUML_SERVER_URL|Address of the PlantUML server (default: $DEFAULT_PLANTUML_SERVER_URL)"
+    echo -en "$envVarTable" | column -ts '|'
+    
+    echo ""
+    
+    echo "Available commands:"
+    local cmdTable=""
+    cmdTable="$cmdTable\n |puml|Generate PlantUML file"
+    cmdTable="$cmdTable\n |svg|Generate SVG file"
+    cmdTable="$cmdTable\n |help|Shows this message"
+    echo -en "$cmdTable" | column -ts '|'
+}
+
+if [[ "${1:0:1}" = "/" ]]; then
+    exec $@
+fi
+
+COMMAND="$1"
+shift
+
+if [[ -z "$COMMAND" ]]; then
+    cmd_help;
+    exit 0;
+fi
+
+if ! _isValidCommand $COMMAND; then
+    echo "Invalid command: \"$COMMAND\""
+    echo ""
+    cmd_help;
+    exit 1;
+fi
+
+cmd_$COMMAND $@
