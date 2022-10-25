@@ -2,9 +2,8 @@ name: Publish Docker image
 
 on:
   push:
-    tags:
-      - v*.*.*
-      - latest
+    branches:
+      - "main"
 
 jobs:
   build_push_to_registry:
@@ -27,23 +26,19 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
 
+      # To update planter, change the version here
+      - name: Set planter version
+        run: |
+          echo "PLANTER_VERSION=4a27d29" >> $GITHUB_ENV
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
         with:
           images: wearelegacy/planter
-          flavor: |
-            latest=false
           tags: |
-            type=semver,pattern={{version}},suffix=-${{ github.run_number }},enable=${{ startsWith(github.ref_name, 'v') }}
-            type=semver,pattern={{version}},enable=${{ startsWith(github.ref_name, 'v') }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref_name, 'v') }}
-            type=semver,pattern={{major}},enable=${{ startsWith(github.ref_name, 'v') }}
+            type=raw,value=${{ env.PLANTER_VERSION }}
             type=raw,value=latest
-
-      - name: Extract planter version from tag
-        run: |
-          echo "PLANTER_VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
