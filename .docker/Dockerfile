@@ -8,14 +8,14 @@ RUN CGO_ENABLED=0 go install \
 
 FROM python:3.9-alpine
 
-ARG PYTHON_PLANTER_VERSION
+ARG PYTHON_PLANTUML_VERSION
 
 RUN apk add --no-cache \
         util-linux
 
 RUN pip install \
         six \
-        plantuml==${PYTHON_PLANTER_VERSION}
+        plantuml==${PYTHON_PLANTUML_VERSION}
 
 COPY --from=Builder /go/bin/planter /usr/bin/
 COPY pg-erd /usr/bin/
